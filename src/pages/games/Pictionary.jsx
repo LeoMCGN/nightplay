@@ -122,18 +122,6 @@ export default function Pictionary() {
     setTimerRunning(true)
   }
 
-  useEffect(() => {
-    if (!timerRunning) return
-    if (timeLeft <= 0) {
-      setTimerRunning(false)
-      if (navigator.vibrate) navigator.vibrate([200, 100, 200])
-      endTurn(false, null)
-      return
-    }
-    timerRef.current = setTimeout(() => setTimeLeft(t => t - 1), 1000)
-    return () => clearTimeout(timerRef.current)
-  }, [timerRunning, timeLeft])
-
   function stopTimer() {
     clearTimeout(timerRef.current)
     setTimerRunning(false)
@@ -149,6 +137,46 @@ export default function Pictionary() {
   const currentTeamDrawer  = currentTeamPlayers[teamDrawerOffset % (currentTeamPlayers.length || 1)]
 
   const drawerLabel = mode === 'individuel' ? currentDrawer : currentTeamDrawer
+
+  // ── Fin de tour ───────────────────────────────────────────────────────────
+  function endTurn(guessed, guesserId) {
+    stopTimer()
+
+    if (guessed) {
+      if (mode === 'individuel') {
+        setScores(prev => {
+          const next = { ...prev }
+          next[currentDrawer] = (next[currentDrawer] || 0) + 2
+          if (guesserId) next[guesserId] = (next[guesserId] || 0) + 1
+          return next
+        })
+      } else {
+        const teamNames    = Object.keys(teams)
+        const guessingTeam = teamNames[(activeTeamIdx + 1) % teamNames.length]
+        setScores(prev => ({
+          ...prev,
+          [guessingTeam]: (prev[guessingTeam] || 0) + 2,
+        }))
+      }
+      setLastPoints({ guessed: true, drawer: drawerLabel, guesser: guesserId })
+    } else {
+      setLastPoints({ guessed: false, drawer: drawerLabel })
+    }
+
+    setPhase('result')
+  }
+
+  useEffect(() => {
+    if (!timerRunning) return
+    if (timeLeft <= 0) {
+      setTimerRunning(false)
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200])
+      endTurn(false, null)
+      return
+    }
+    timerRef.current = setTimeout(() => setTimeLeft(t => t - 1), 1000)
+    return () => clearTimeout(timerRef.current)
+  }, [timerRunning, timeLeft])
 
   // ── Custom words ──────────────────────────────────────────────────────────
   function addCustomWord() {
@@ -203,34 +231,6 @@ export default function Pictionary() {
   function handleStartDraw() {
     setPhase('draw')
     startTimer()
-  }
-
-  // ── Fin de tour ───────────────────────────────────────────────────────────
-  function endTurn(guessed, guesserId) {
-    stopTimer()
-
-    if (guessed) {
-      if (mode === 'individuel') {
-        setScores(prev => {
-          const next = { ...prev }
-          next[currentDrawer] = (next[currentDrawer] || 0) + 2
-          if (guesserId) next[guesserId] = (next[guesserId] || 0) + 1
-          return next
-        })
-      } else {
-        const teamNames    = Object.keys(teams)
-        const guessingTeam = teamNames[(activeTeamIdx + 1) % teamNames.length]
-        setScores(prev => ({
-          ...prev,
-          [guessingTeam]: (prev[guessingTeam] || 0) + 2,
-        }))
-      }
-      setLastPoints({ guessed: true, drawer: drawerLabel, guesser: guesserId })
-    } else {
-      setLastPoints({ guessed: false, drawer: drawerLabel })
-    }
-
-    setPhase('result')
   }
 
   function handleGuessed() {
