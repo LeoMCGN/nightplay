@@ -70,7 +70,7 @@ export default function Pictionary() {
 
   useEffect(() => {
     if (players.length === 0) navigate('/')
-  }, [])
+  }, [players, navigate])
 
   // ── Phase ─────────────────────────────────────────────────────────────────
   const [phase, setPhase] = useState('setup') // setup | secret | draw | result
@@ -126,7 +126,8 @@ export default function Pictionary() {
     if (!timerRunning) return
     if (timeLeft <= 0) {
       setTimerRunning(false)
-      handleTimeout()
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200])
+      endTurn(false, null)
       return
     }
     timerRef.current = setTimeout(() => setTimeLeft(t => t - 1), 1000)
@@ -136,11 +137,6 @@ export default function Pictionary() {
   function stopTimer() {
     clearTimeout(timerRef.current)
     setTimerRunning(false)
-  }
-
-  function handleTimeout() {
-    if (navigator.vibrate) navigator.vibrate([200, 100, 200])
-    endTurn(false, null)
   }
 
   // ── Computed ──────────────────────────────────────────────────────────────
@@ -283,12 +279,10 @@ export default function Pictionary() {
   const [eraser, setEraser]       = useState(false)
 
   function getPos(e, canvas) {
-    const rect    = canvas.getBoundingClientRect()
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    const rect = canvas.getBoundingClientRect()
     return {
-      x: (clientX - rect.left) * (canvas.width  / rect.width),
-      y: (clientY - rect.top)  * (canvas.height / rect.height),
+      x: (e.clientX - rect.left) * (canvas.width  / rect.width),
+      y: (e.clientY - rect.top)  * (canvas.height / rect.height),
     }
   }
 
