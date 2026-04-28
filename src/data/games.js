@@ -47,4 +47,20 @@ export const GAMES = [
       { label: '🧠 Stratégie', color: '#7C3AED' },
     ],
   },
+  {
+    id: 'pictionary',
+    name: 'Pictionary',
+    emoji: '🎨',
+    description: 'Dessine, fais deviner, marque des points !',
+    color: '#10B981',
+    gradient: 'from-emerald-500 to-teal-600',
+    minPlayers: 2,
+    maxPlayers: 16,
+    route: '/play/pictionary',
+    tags: [
+      { label: '👥 Grand public', color: '#6366F1' },
+      { label: '🎨 Créativité', color: '#10B981' },
+      { label: '⏱ Timer', color: '#F97316' },
+    ],
+  },
 ]

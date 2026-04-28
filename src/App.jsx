@@ -6,6 +6,7 @@ import PlayerSetup from './pages/PlayerSetup'
 import ActionVerite from './pages/games/ActionVerite'
 import Imposteur from './pages/games/Imposteur'
 import Bouteille from './pages/games/Bouteille'
+import Pictionary from './pages/games/Pictionary'
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
             <Route path="/play/action-verite" element={<ActionVerite />} />
             <Route path="/play/imposteur" element={<Imposteur />} />
             <Route path="/play/bouteille" element={<Bouteille />} />
+            <Route path="/play/pictionary" element={<Pictionary />} />
           </Routes>
         </AnimatePresence>
       </BrowserRouter>
