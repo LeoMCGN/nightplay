@@ -1,0 +1,53 @@
+{
+  "animaux": [
+    "chien","chat","éléphant","girafe","pingouin","crocodile","dauphin","baleine",
+    "araignée","serpent","aigle","hibou","flamant rose","kangourou","koala",
+    "requin","pieuvre","papillon","grenouille","tortue","loup","renard","ours",
+    "singe","zèbre","lion","tigre","perroquet","cheval","cochon","vache","mouton",
+    "poule","canard","lapin"
+  ],
+  "objets": [
+    "parapluie","réfrigérateur","télévision","chaussure","lunettes","montre",
+    "bougie","valise","escalier","ascenseur","miroir","brosse à dents","peigne",
+    "ciseaux","marteau","clé","cadenas","ampoule","prise électrique","téléphone",
+    "ordinateur","casque","vélo","moto","voiture","avion","bateau","fusée",
+    "crayon","stylo","livre","agenda","sac à dos","panier","bouteille"
+  ],
+  "films": [
+    "Titanic","Le Roi Lion","Avatar","Inception","Intouchables","La La Land",
+    "Forrest Gump","Matrix","Jurassic Park","Harry Potter","Star Wars","Frozen",
+    "Toy Story","Le Seigneur des Anneaux","Indiana Jones","Batman","Spider-Man",
+    "Shrek","Zootopie","Interstellar","Pulp Fiction","Le Parrain","Dirty Dancing",
+    "Top Gun","Grease","Bohemian Rhapsody","La Reine des Neiges","Raiponce",
+    "Cars","Coco","Moi Moche et Méchant","Les Minions","Astérix","Tintin"
+  ],
+  "actions": [
+    "nager","sauter","courir","danser","chanter","dormir","manger","boire",
+    "conduire","voler","tomber","grimper","lancer","attraper","pousser","tirer",
+    "lire","écrire","dessiner","peindre","cuisiner","jardiner","photographier",
+    "skier","surfer","boxer","jongler","méditer","pleurer","rire","crier",
+    "chuchoter","embrasser","applaudir","bâiller"
+  ],
+  "metiers": [
+    "pompier","chirurgien","astronaute","cuisinier","coiffeur","architecte",
+    "pilote","plongeur","détective","magicien","clown","journaliste","photographe",
+    "musicien","peintre","sculpteur","professeur","dentiste","vétérinaire",
+    "boulanger","boucher","pâtissier","jardinier","plombier","électricien",
+    "facteur","policier","juge","avocat","acteur","mannequin","sportif","marin",
+    "agriculteur","pompiste"
+  ],
+  "lieux": [
+    "plage","forêt","montagne","désert","aéroport","gare","musée","bibliothèque",
+    "stade","cinéma","hôpital","école","université","restaurant","hôtel",
+    "supermarché","marché","zoo","parc d'attractions","cirque","casino","église",
+    "château","phare","île","grotte","volcan","jungle","banquise","prairie",
+    "port","tunnel","pont","tour Eiffel","pyramide"
+  ],
+  "nourriture": [
+    "pizza","sushi","crêpe","hamburger","tacos","raclette","fondue","paëlla",
+    "ramen","croissant","baguette","camembert","macarons","éclair","tarte tatin",
+    "glace","crème brûlée","mousse au chocolat","choucroute","cassoulet",
+    "bouillabaisse","quiche","soufflé","brioche","madeleine","biscuit","gaufre",
+    "churros","donuts","nachos","guacamole","hummus","sashimi","dim sum","kebab"
+  ]
+}
