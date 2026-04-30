@@ -622,7 +622,6 @@ export default function Pictionary() {
                 <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
                   {drawerLabel} dessine
                 </p>
-                <p className="text-base font-bold text-white">{currentWord}</p>
               </div>
               {timerValue > 0 ? (
                 <div
