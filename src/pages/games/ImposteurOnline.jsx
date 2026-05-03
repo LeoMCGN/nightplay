@@ -456,6 +456,113 @@ export default function ImposteurOnline() {
           </motion.div>
         )}
 
+        {/* ── REVEALING ──────────────────────────────────────────────────── */}
+        {phase === 'revealing' && (
+          <motion.div key="revealing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-8 py-6">
+            <motion.p className="text-2xl font-bold text-white text-center" animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 0.8, repeat: Infinity }}>
+              ⚡ Dépouillement…
+            </motion.p>
+            <div className="flex flex-col gap-3 w-full max-w-xs">
+              {players.map((p, i) => (
+                <motion.div key={p.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.15 }}
+                  className="flex items-center justify-between rounded-2xl px-5 py-3"
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <span className="font-semibold text-white">🕵️ {p.name}</span>
+                  <motion.span className="text-lg" animate={{ opacity: [1, 0, 1] }} transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.2 }} style={{ color: 'var(--color-text-muted)' }}>···</motion.span>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── RESULT ─────────────────────────────────────────────────────── */}
+        {phase === 'result' && currentRound && (() => {
+          const { tally, imposteurPlayer, found } = calcTally(players)
+          const sortedPlayers = [...players].sort((a, b) => b.score - a.score)
+          return (
+            <motion.div key="result" initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: 'spring', stiffness: 200, damping: 20 }} className="flex flex-col items-center gap-5 text-center">
+              <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+                {found ? (
+                  <><div className="text-6xl mb-3">🎉</div><h2 className="text-3xl font-bold text-white mb-1">Démasqué !</h2><p className="text-green-400 font-semibold">Le groupe a trouvé l'imposteur.</p></>
+                ) : (
+                  <><div className="text-6xl mb-3">🕵️</div><h2 className="text-3xl font-bold text-white mb-1">L'imposteur a gagné !</h2><p className="text-orange-400 font-semibold">Personne n'a vu la différence.</p></>
+                )}
+              </motion.div>
+
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="w-full rounded-2xl p-5 text-left" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <p className="text-sm font-semibold mb-4" style={{ color: 'var(--color-text-muted)' }}>Révélation</p>
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <p className="text-xs mb-1" style={{ color: 'var(--color-text-muted)' }}>Mot commun</p>
+                    <p className="text-2xl font-bold" style={{ color: '#7C3AED' }}>{currentRound.mot_commun}</p>
+                  </div>
+                  <div className="h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
+                  <div>
+                    <p className="text-xs mb-1" style={{ color: 'var(--color-text-muted)' }}>Mot de l'imposteur · {imposteurPlayer?.name}</p>
+                    <p className="text-2xl font-bold text-orange-400">{currentRound.mot_imposteur}</p>
+                  </div>
+                </div>
+              </motion.div>
+
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="w-full rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <p className="text-sm font-semibold mb-2" style={{ color: 'var(--color-text-muted)' }}>Votes</p>
+                {Object.entries(tally).sort((a, b) => b[1] - a[1]).map(([name, count]) => (
+                  <div key={name} className="flex justify-between text-sm py-1">
+                    <span className={name === imposteurPlayer?.name ? 'text-orange-400 font-bold' : 'text-white'}>{name}</span>
+                    <span style={{ color: name === imposteurPlayer?.name ? '#EC4899' : 'var(--color-text-muted)' }}>{count} vote{count > 1 ? 's' : ''}{name === imposteurPlayer?.name && ' 🕵️'}</span>
+                  </div>
+                ))}
+              </motion.div>
+
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }} className="w-full rounded-2xl p-4" style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.25)' }}>
+                <p className="text-sm font-semibold mb-3" style={{ color: '#7C3AED' }}>🏆 Scores</p>
+                {sortedPlayers.map((p, i) => (
+                  <div key={p.id} className="flex items-center justify-between py-1.5">
+                    <span className={`text-sm font-semibold ${p.is_imposteur ? 'text-orange-400' : 'text-white'}`}>{i + 1}. {p.name}</span>
+                    <span className="text-sm font-bold text-white">{p.score} pts</span>
+                  </div>
+                ))}
+              </motion.div>
+
+              {isHost && (
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }} className="flex gap-3 w-full">
+                  <Button variant="ghost" onClick={() => supabase.from('imp_rooms').update({ status: 'finished' }).eq('id', room.id)}>Quitter</Button>
+                  {!isLastRound ? (
+                    <Button variant="secondary" fullWidth onClick={handleNextRound}>
+                      Manche {room.current_round + 1}{room.total_rounds > 0 ? ` / ${room.total_rounds}` : ''} →
+                    </Button>
+                  ) : (
+                    <Button variant="primary" fullWidth onClick={handleEndGame}>🏆 Voir le podium</Button>
+                  )}
+                </motion.div>
+              )}
+              {!isHost && <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>En attente du host…</p>}
+            </motion.div>
+          )
+        })()}
+
+        {/* ── FINISHED ───────────────────────────────────────────────────── */}
+        {phase === 'finished' && (
+          <motion.div key="finished" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-6 py-8 text-center">
+            <div className="text-6xl">🏆</div>
+            <h2 className="text-3xl font-bold text-white">Fin de la partie !</h2>
+            <div className="flex flex-col gap-2 w-full">
+              {[...players].sort((a, b) => b.score - a.score).map((p, i) => (
+                <motion.div key={p.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }}
+                  className="flex items-center justify-between rounded-2xl px-5 py-4"
+                  style={{ background: i === 0 ? 'rgba(124,58,237,0.2)' : i === 1 ? 'rgba(156,163,175,0.15)' : i === 2 ? 'rgba(180,120,60,0.15)' : 'rgba(255,255,255,0.05)', border: `2px solid ${i === 0 ? '#7C3AED' : i === 1 ? '#9CA3AF' : i === 2 ? '#B47C3C' : 'rgba(255,255,255,0.08)'}` }}>
+                  <span className="text-xl font-black text-white">{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`} {p.name}</span>
+                  <span className="text-xl font-bold" style={{ color: '#A78BFA' }}>{p.score} pts</span>
+                </motion.div>
+              ))}
+            </div>
+            <div className="flex flex-col gap-3 w-full mt-4">
+              <Button onClick={() => navigate('/play/imposteur-online')} fullWidth size="lg">🔄 Rejouer</Button>
+              <Button onClick={() => navigate('/')} fullWidth variant="ghost">🏠 Accueil</Button>
+            </div>
+          </motion.div>
+        )}
+
       </AnimatePresence>
     </Layout>
   )
