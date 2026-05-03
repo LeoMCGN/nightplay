@@ -129,7 +129,7 @@ export default function PetitBac() {
       )
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bac_answers' },
         payload => {
-          if (payload.new) {
+          if (payload.new && currentRound && payload.new.round_id === currentRound.id) {
             setAnswers(prev => [...prev.filter(a => a.id !== payload.new.id), payload.new])
           }
         }
@@ -165,12 +165,15 @@ export default function PetitBac() {
     setTimerRunning(true)
   }
 
+  const handleSubmitAnswersRef = useRef(handleSubmitAnswers)
+  useEffect(() => { handleSubmitAnswersRef.current = handleSubmitAnswers }, [handleSubmitAnswers])
+
   useEffect(() => {
     if (!timerRunning) return
     if (timeLeft <= 0) {
       setTimerRunning(false)
       if (navigator.vibrate) navigator.vibrate([200, 100, 200])
-      handleSubmitAnswers()
+      handleSubmitAnswersRef.current()
       return
     }
     timerRef.current = setTimeout(() => setTimeLeft(t => t - 1), 1000)
@@ -239,14 +242,15 @@ export default function PetitBac() {
 
     await Promise.all(updates)
 
-    for (const [playerId, delta] of Object.entries(playerScoreDeltas)) {
-      const player = players.find(p => p.id === playerId)
-      if (player) {
-        await supabase.from('bac_players')
+    await Promise.all(
+      Object.entries(playerScoreDeltas).map(([playerId, delta]) => {
+        const player = players.find(p => p.id === playerId)
+        if (!player) return Promise.resolve()
+        return supabase.from('bac_players')
           .update({ score: (player.score || 0) + delta })
           .eq('id', playerId)
-      }
-    }
+      })
+    )
 
     const { data: updatedAnswers } = await supabase
       .from('bac_answers')
