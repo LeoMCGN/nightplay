@@ -64,6 +64,7 @@ export default function ImposteurOnline() {
   const [timeLeft, setTimeLeft]         = useState(0)
   const [timerRunning, setTimerRunning] = useState(false)
   const timerRef = useRef(null)
+  const computedRef = useRef(false)
 
   // Config lobby (host uniquement)
   const [hostTimer,  setHostTimer]  = useState(120)
@@ -121,9 +122,14 @@ export default function ImposteurOnline() {
     const { data: existingPlayers } = await supabase
       .from('imp_players').select().eq('room_id', roomData.id)
 
+    const newPlayer = { id: playerId, room_id: roomData.id, name: myName.trim(), is_host: false, score: 0, word: null, is_imposteur: false, voted_for: null, status: 'waiting' }
+    const allPlayers = existingPlayers
+      ? existingPlayers.some(p => p.id === playerId) ? existingPlayers : [...existingPlayers, newPlayer]
+      : [newPlayer]
+
     setMyPlayerId(playerId)
     setRoom(roomData)
-    setPlayers(existingPlayers || [])
+    setPlayers(allPlayers)
     setPhase('lobby')
   }
 
@@ -156,7 +162,7 @@ export default function ImposteurOnline() {
   useEffect(() => {
     if (!room) return
     if (room.status === 'waiting')      setPhase('lobby')
-    if (room.status === 'distribution') setPhase('distribution')
+    if (room.status === 'distribution') { setPhase('distribution'); computedRef.current = false }
     if (room.status === 'discussion')   { setPhase('discussion'); if (room.discussion_time > 0) { setTimeLeft(room.discussion_time); setTimerRunning(true) } }
     if (room.status === 'vote')         { setPhase('vote'); setTimerRunning(false) }
     if (room.status === 'revealing')    setPhase('revealing')
@@ -174,14 +180,14 @@ export default function ImposteurOnline() {
     }
     timerRef.current = setTimeout(() => setTimeLeft(t => t - 1), 1000)
     return () => clearTimeout(timerRef.current)
-  }, [timerRunning, timeLeft])
+  }, [timerRunning, timeLeft, isHost, room])
 
   // ── Host détecte quand tous ont voté ─────────────────────────────────────
   useEffect(() => {
     if (!isHost || room?.status !== 'vote') return
     const allVoted = players.length >= 3 && players.every(p => p.voted_for)
     if (allVoted) computeAndSaveResults()
-  }, [players, isHost, room?.status])
+  }, [players, isHost, room?.status, computeAndSaveResults])
 
   // ── Lancer la partie / manche (host) ─────────────────────────────────────
   async function handleStartGame() {
@@ -237,7 +243,8 @@ export default function ImposteurOnline() {
 
   // ── Calcul résultats (host) ───────────────────────────────────────────────
   const computeAndSaveResults = useCallback(async () => {
-    if (!isHost) return
+    if (!isHost || computedRef.current) return
+    computedRef.current = true
     const { tally, imposteurPlayer, found } = calcTally(players)
 
     await Promise.all(players.map(p => {
