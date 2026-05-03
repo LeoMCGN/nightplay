@@ -265,6 +265,37 @@ export default function PetitBac() {
     }
   }, [phase, isHost])
 
+  // ── Round suivant (host) ──────────────────────────────────────────────────
+  async function handleNextRound() {
+    if (!isHost || !room) return
+    const nextRound = room.current_round + 1
+
+    await Promise.all(players.map(p =>
+      supabase.from('bac_players').update({ status: 'waiting' }).eq('id', p.id)
+    ))
+
+    setMyAnswers({})
+    setAnswers([])
+
+    await supabase.from('bac_rounds').insert({
+      room_id: room.id,
+      round_number: nextRound,
+      letter: randomLetter(),
+    })
+
+    await supabase.from('bac_rooms').update({
+      status: 'playing',
+      current_round: nextRound,
+    }).eq('id', room.id)
+  }
+
+  async function handleEndGame() {
+    if (!isHost || !room) return
+    await supabase.from('bac_rooms').update({ status: 'finished' }).eq('id', room.id)
+  }
+
+  const isLastRound = room && room.total_rounds > 0 && room.current_round >= room.total_rounds
+
   // ── Créer une room ─────────────────────────────────────────────────────────
   async function handleCreate() {
     if (!myName.trim()) return
@@ -677,6 +708,104 @@ export default function PetitBac() {
                 Calcul des scores…
               </p>
             )}
+          </motion.div>
+        )}
+
+        {/* ── SCORES ─────────────────────────────────────────────────────── */}
+        {phase === 'scores' && room && (
+          <motion.div
+            key="scores"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex flex-col gap-5"
+          >
+            <div className="text-center">
+              <p className="text-sm mb-1" style={{ color: 'var(--color-text-muted)' }}>
+                Round {room.current_round}{room.total_rounds > 0 ? `/${room.total_rounds}` : ''}
+              </p>
+              <h2 className="text-2xl font-bold text-white">🏆 Scores</h2>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              {[...players].sort((a, b) => b.score - a.score).map((p, i) => (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between rounded-2xl px-4 py-3"
+                  style={{
+                    background: i === 0 ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.05)',
+                    border: `1px solid ${i === 0 ? 'rgba(245,158,11,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                  }}
+                >
+                  <span className="font-bold text-white">
+                    {i === 0 ? '🥇 ' : i === 1 ? '🥈 ' : i === 2 ? '🥉 ' : `${i + 1}. `}{p.name}
+                    {p.id === myPlayerId && <span className="text-xs ml-2" style={{ color: 'var(--color-text-muted)' }}>(toi)</span>}
+                  </span>
+                  <span className="font-bold text-lg" style={{ color: '#F59E0B' }}>{p.score} pts</span>
+                </div>
+              ))}
+            </div>
+
+            {isHost && (
+              <Button
+                onClick={isLastRound ? handleEndGame : handleNextRound}
+                fullWidth
+                size="lg"
+                variant="primary"
+              >
+                {isLastRound ? '🏁 Voir le podium' : '▶️ Round suivant'}
+              </Button>
+            )}
+
+            {!isHost && (
+              <p className="text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                En attente du host…
+              </p>
+            )}
+          </motion.div>
+        )}
+
+        {/* ── FINISHED ───────────────────────────────────────────────────── */}
+        {phase === 'finished' && (
+          <motion.div
+            key="finished"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex flex-col items-center gap-6 py-8 text-center"
+          >
+            <div className="text-6xl">🏆</div>
+            <h2 className="text-3xl font-bold text-white">Fin de la partie !</h2>
+
+            <div className="flex flex-col gap-2 w-full">
+              {[...players].sort((a, b) => b.score - a.score).map((p, i) => (
+                <motion.div
+                  key={p.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                  className="flex items-center justify-between rounded-2xl px-5 py-4"
+                  style={{
+                    background: i === 0 ? 'rgba(245,158,11,0.2)' : i === 1 ? 'rgba(156,163,175,0.15)' : i === 2 ? 'rgba(180,120,60,0.15)' : 'rgba(255,255,255,0.05)',
+                    border: `2px solid ${i === 0 ? '#F59E0B' : i === 1 ? '#9CA3AF' : i === 2 ? '#B47C3C' : 'rgba(255,255,255,0.08)'}`,
+                  }}
+                >
+                  <span className="text-xl font-black text-white">
+                    {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`} {p.name}
+                  </span>
+                  <span className="text-xl font-bold" style={{ color: '#F59E0B' }}>{p.score} pts</span>
+                </motion.div>
+              ))}
+            </div>
+
+            <div className="flex flex-col gap-3 w-full mt-4">
+              <Button onClick={() => navigate('/play/petit-bac')} fullWidth size="lg">
+                🔄 Rejouer
+              </Button>
+              <Button onClick={() => navigate('/')} fullWidth variant="ghost">
+                🏠 Accueil
+              </Button>
+            </div>
           </motion.div>
         )}
 
