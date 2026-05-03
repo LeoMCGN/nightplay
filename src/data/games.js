@@ -79,4 +79,19 @@ export const GAMES = [
       { label: '⏱ Timer', color: '#F97316' },
     ],
   },
+  {
+    id: 'imposteur-online',
+    name: "L'Imposteur Online",
+    emoji: '🕵️',
+    description: 'Trouve l\'imposteur — chacun sur son téléphone !',
+    color: '#7C3AED',
+    gradient: 'from-violet-600 to-purple-900',
+    minPlayers: 3,
+    maxPlayers: 12,
+    route: '/play/imposteur-online',
+    tags: [
+      { label: '📱 Multijoueur', color: '#3B82F6' },
+      { label: '🧠 Stratégie', color: '#7C3AED' },
+    ],
+  },
 ]
