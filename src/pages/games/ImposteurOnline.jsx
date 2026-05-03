@@ -356,6 +356,106 @@ export default function ImposteurOnline() {
           </motion.div>
         )}
 
+        {/* ── DISTRIBUTION ───────────────────────────────────────────────────────────────── */}
+        {phase === 'distribution' && myPlayer && (
+          <motion.div key="distribution" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="flex flex-col items-center gap-8 text-center">
+            <div>
+              <p className="text-sm mb-1" style={{ color: 'var(--color-text-muted)' }}>
+                Manche {room?.current_round}{room?.total_rounds > 0 ? ` / ${room.total_rounds}` : ''}
+              </p>
+              <h2 className="text-2xl font-bold text-white">Ton mot secret</h2>
+            </div>
+
+            <div className="w-full max-w-xs rounded-2xl p-8 flex flex-col items-center gap-4"
+              style={{ background: myPlayer.is_imposteur ? 'rgba(249,115,22,0.1)' : 'rgba(124,58,237,0.1)', border: `2px solid ${myPlayer.is_imposteur ? '#F97316' : '#7C3AED'}` }}>
+              {myPlayer.is_imposteur ? (
+                <>
+                  <span className="text-4xl">⚠️</span>
+                  <p className="text-xl font-bold text-orange-400">Tu es l'IMPOSTEUR !</p>
+                  <div className="h-px w-full" style={{ background: 'rgba(249,115,22,0.3)' }} />
+                  <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Ton mot (différent des autres) :</p>
+                  <p className="text-3xl font-bold text-orange-400">{myPlayer.word}</p>
+                </>
+              ) : (
+                <>
+                  <span className="text-5xl">🃏</span>
+                  <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Ton mot :</p>
+                  <p className="text-4xl font-bold text-white">{myPlayer.word}</p>
+                </>
+              )}
+            </div>
+
+            {myPlayer.status !== 'ready' ? (
+              <Button onClick={handleReady} size="lg" variant="primary" fullWidth>✅ Prêt !</Button>
+            ) : (
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-sm" style={{ color: '#10B981' }}>
+                ✓ En attente des autres joueurs… ({players.filter(p => p.status === 'ready').length}/{players.length})
+              </motion.p>
+            )}
+          </motion.div>
+        )}
+
+        {/* ── DISCUSSION ─────────────────────────────────────────────────────────────────── */}
+        {phase === 'discussion' && (
+          <motion.div key="discussion" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="flex flex-col items-center gap-6">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-white mb-2">Discussion</h2>
+              <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                Décrivez votre mot à tour de rôle — sans le dire. Un joueur a un mot différent…
+              </p>
+            </div>
+
+            {room?.discussion_time > 0 && (
+              <div className="w-full max-w-xs">
+                <div className="text-center text-5xl font-bold mb-3" style={{ color: timeLeft / room.discussion_time < 0.25 ? '#EF4444' : '#F9FAFB' }}>
+                  {formatTime(timeLeft)}
+                </div>
+                <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
+                  <motion.div className="h-2 rounded-full" animate={{ width: `${timerPercent}%` }} transition={{ duration: 0.5 }}
+                    style={{ background: timerPercent < 25 ? '#EF4444' : '#7C3AED' }} />
+                </div>
+              </div>
+            )}
+
+            {isHost && (
+              <Button variant="secondary" size="md" onClick={() => supabase.from('imp_rooms').update({ status: 'vote' }).eq('id', room.id)}>
+                Passer au vote →
+              </Button>
+            )}
+            {!isHost && <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Le host passera au vote quand la discussion sera terminée</p>}
+          </motion.div>
+        )}
+
+        {/* ── VOTE ───────────────────────────────────────────────────────────────────────── */}
+        {phase === 'vote' && (
+          <motion.div key="vote" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="flex flex-col gap-6">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-white mb-1">Qui est l'imposteur ?</h2>
+              <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                {players.filter(p => p.voted_for).length}/{players.length} ont voté
+              </p>
+            </div>
+
+            {!myPlayer?.voted_for ? (
+              <div className="flex flex-col gap-2">
+                {players.filter(p => p.id !== myPlayerId).map(suspect => (
+                  <motion.button key={suspect.id} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                    onClick={() => handleVote(suspect.name)}
+                    className="w-full rounded-2xl px-5 py-4 text-left font-semibold text-white"
+                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                    🕵️ {suspect.name}
+                  </motion.button>
+                ))}
+              </div>
+            ) : (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center flex flex-col items-center gap-3">
+                <p className="text-white">Tu as voté pour <strong>{myPlayer.voted_for}</strong></p>
+                <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>En attente des autres…</p>
+              </motion.div>
+            )}
+          </motion.div>
+        )}
+
       </AnimatePresence>
     </Layout>
   )
