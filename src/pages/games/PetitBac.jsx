@@ -165,8 +165,7 @@ export default function PetitBac() {
     setTimerRunning(true)
   }
 
-  const handleSubmitAnswersRef = useRef(handleSubmitAnswers)
-  useEffect(() => { handleSubmitAnswersRef.current = handleSubmitAnswers }, [handleSubmitAnswers])
+  const handleSubmitAnswersRef = useRef(null)
 
   useEffect(() => {
     if (!timerRunning) return
@@ -215,6 +214,8 @@ export default function PetitBac() {
     await supabase.from('bac_answers').insert(rows)
     await supabase.from('bac_players').update({ status: 'answered' }).eq('id', myPlayerId)
   }, [currentRound, myPlayerId, myAnswers, room?.categories])
+
+  useEffect(() => { handleSubmitAnswersRef.current = handleSubmitAnswers }, [handleSubmitAnswers])
 
   // ── Calcul des scores (host uniquement) ───────────────────────────────────
   const computeAndSaveScores = useCallback(async () => {
