@@ -99,9 +99,142 @@ export default function PetitBac() {
 
   const isHost = room && myPlayerId && room.host_id === myPlayerId
 
+  // ── Créer une room ─────────────────────────────────────────────────────────
+  async function handleCreate() {
+    if (!myName.trim()) return
+    const code = generateCode()
+    const playerId = crypto.randomUUID()
+
+    const { data: roomData, error: roomErr } = await supabase
+      .from('bac_rooms')
+      .insert({ code, host_id: playerId })
+      .select()
+      .single()
+
+    if (roomErr) { console.error(roomErr); return }
+
+    const { data: playerData, error: playerErr } = await supabase
+      .from('bac_players')
+      .insert({ room_id: roomData.id, name: myName.trim(), is_host: true, id: playerId })
+      .select()
+      .single()
+
+    if (playerErr) { console.error(playerErr); return }
+
+    setMyPlayerId(playerId)
+    setRoom(roomData)
+    setPlayers([playerData])
+    setPhase('lobby')
+  }
+
+  // ── Rejoindre une room ────────────────────────────────────────────────────
+  async function handleJoin() {
+    if (!myName.trim() || !joinCode.trim()) return
+    setJoinError('')
+
+    const { data: roomData, error: roomErr } = await supabase
+      .from('bac_rooms')
+      .select()
+      .eq('code', joinCode.trim().toUpperCase())
+      .eq('status', 'waiting')
+      .single()
+
+    if (roomErr || !roomData) {
+      setJoinError('Code invalide ou partie déjà commencée.')
+      return
+    }
+
+    const playerId = crypto.randomUUID()
+    const { data: playerData, error: playerErr } = await supabase
+      .from('bac_players')
+      .insert({ room_id: roomData.id, name: myName.trim(), is_host: false, id: playerId })
+      .select()
+      .single()
+
+    if (playerErr) { console.error(playerErr); return }
+
+    const { data: existingPlayers } = await supabase
+      .from('bac_players')
+      .select()
+      .eq('room_id', roomData.id)
+
+    setMyPlayerId(playerId)
+    setRoom(roomData)
+    setPlayers(existingPlayers || [])
+    setPhase('lobby')
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <Layout>
-      <p className="text-white">PetitBac — phase: {phase}</p>
+      <AnimatePresence mode="wait">
+
+        {/* ── ENTRY ──────────────────────────────────────────────────────── */}
+        {phase === 'entry' && (
+          <motion.div
+            key="entry"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="flex flex-col gap-6"
+          >
+            <div>
+              <button
+                onClick={() => navigate('/')}
+                className="text-sm mb-4 block"
+                style={{ color: 'var(--color-text-muted)' }}
+              >
+                ← Retour
+              </button>
+              <h2 className="text-2xl font-bold text-white mb-1">🔤 Le Petit Bac</h2>
+              <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                Multijoueur — chacun sur son téléphone
+              </p>
+            </div>
+
+            <div>
+              <p className="text-sm font-semibold text-white mb-2">Ton prénom</p>
+              <input
+                value={myName}
+                onChange={e => setMyName(e.target.value)}
+                placeholder="Entrer ton prénom…"
+                className="w-full rounded-xl px-4 py-3 text-sm text-white"
+                style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', outline: 'none' }}
+              />
+            </div>
+
+            <Button onClick={handleCreate} fullWidth size="lg" disabled={!myName.trim()}>
+              🎮 Créer une partie
+            </Button>
+
+            <div>
+              <p className="text-sm font-semibold text-white mb-2">Rejoindre avec un code</p>
+              <div className="flex gap-2">
+                <input
+                  value={joinCode}
+                  onChange={e => setJoinCode(e.target.value.toUpperCase())}
+                  placeholder="EX: ABCDEF"
+                  maxLength={6}
+                  className="flex-1 rounded-xl px-4 py-3 text-sm text-white font-mono tracking-widest"
+                  style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', outline: 'none' }}
+                />
+                <Button
+                  onClick={handleJoin}
+                  size="md"
+                  variant="secondary"
+                  disabled={!myName.trim() || joinCode.length < 6}
+                >
+                  Rejoindre
+                </Button>
+              </div>
+              {joinError && (
+                <p className="text-sm mt-2" style={{ color: '#EF4444' }}>{joinError}</p>
+              )}
+            </div>
+          </motion.div>
+        )}
+
+      </AnimatePresence>
     </Layout>
   )
 }
