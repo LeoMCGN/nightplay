@@ -213,6 +213,58 @@ export default function PetitBac() {
     await supabase.from('bac_players').update({ status: 'answered' }).eq('id', myPlayerId)
   }, [currentRound, myPlayerId, myAnswers, room?.categories])
 
+  // ── Calcul des scores (host uniquement) ───────────────────────────────────
+  const computeAndSaveScores = useCallback(async () => {
+    if (!isHost || !currentRound) return
+
+    const { data: allAnswers } = await supabase
+      .from('bac_answers')
+      .select()
+      .eq('round_id', currentRound.id)
+
+    if (!allAnswers) return
+
+    const categories = room?.categories || []
+    const updates = []
+    const playerScoreDeltas = {}
+
+    for (const cat of categories) {
+      const catAnswers = allAnswers.filter(a => a.category === cat)
+      const scored = computePoints(catAnswers)
+      for (const a of scored) {
+        updates.push(supabase.from('bac_answers').update({ points: a.points }).eq('id', a.id))
+        playerScoreDeltas[a.player_id] = (playerScoreDeltas[a.player_id] || 0) + a.points
+      }
+    }
+
+    await Promise.all(updates)
+
+    for (const [playerId, delta] of Object.entries(playerScoreDeltas)) {
+      const player = players.find(p => p.id === playerId)
+      if (player) {
+        await supabase.from('bac_players')
+          .update({ score: (player.score || 0) + delta })
+          .eq('id', playerId)
+      }
+    }
+
+    const { data: updatedAnswers } = await supabase
+      .from('bac_answers')
+      .select()
+      .eq('round_id', currentRound.id)
+
+    if (updatedAnswers) setAnswers(updatedAnswers)
+
+    await supabase.from('bac_rounds').update({ status: 'done' }).eq('id', currentRound.id)
+    await supabase.from('bac_rooms').update({ status: 'scores' }).eq('id', room.id)
+  }, [isHost, currentRound, room, players])
+
+  useEffect(() => {
+    if (phase === 'revealing' && isHost) {
+      computeAndSaveScores()
+    }
+  }, [phase, isHost])
+
   // ── Créer une room ─────────────────────────────────────────────────────────
   async function handleCreate() {
     if (!myName.trim()) return
@@ -559,6 +611,71 @@ export default function PetitBac() {
               >
                 ✓ Réponses envoyées — en attente des autres joueurs…
               </motion.p>
+            )}
+          </motion.div>
+        )}
+
+        {/* ── REVEALING ──────────────────────────────────────────────────── */}
+        {phase === 'revealing' && currentRound && room && (
+          <motion.div
+            key="revealing"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex flex-col gap-5"
+          >
+            <div className="text-center">
+              <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--color-text-muted)' }}>
+                Lettre
+              </p>
+              <p className="text-5xl font-black" style={{ color: '#F59E0B' }}>{currentRound.letter}</p>
+            </div>
+
+            {(room.categories || []).map(catId => {
+              const cat = ALL_CATEGORIES.find(c => c.id === catId)
+              if (!cat) return null
+              const catAnswers = answers.filter(a => a.category === catId)
+              return (
+                <div key={catId}>
+                  <p className="text-sm font-bold text-white mb-2">{cat.label}</p>
+                  <div className="flex flex-col gap-1">
+                    {players.map(p => {
+                      const ans = catAnswers.find(a => a.player_id === p.id)
+                      return (
+                        <div
+                          key={p.id}
+                          className="flex items-center justify-between rounded-xl px-3 py-2"
+                          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+                        >
+                          <span className="text-sm text-white font-medium">{p.name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm" style={{ color: ans?.answer ? '#fff' : 'rgba(255,255,255,0.3)' }}>
+                              {ans?.answer || '—'}
+                            </span>
+                            {ans && (
+                              <span
+                                className="text-xs font-bold px-2 py-0.5 rounded-full"
+                                style={{
+                                  background: ans.points === 2 ? 'rgba(16,185,129,0.2)' : ans.points === 1 ? 'rgba(249,115,22,0.2)' : 'rgba(239,68,68,0.2)',
+                                  color: ans.points === 2 ? '#10B981' : ans.points === 1 ? '#F97316' : '#EF4444',
+                                }}
+                              >
+                                +{ans.points}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+
+            {!isHost && (
+              <p className="text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                Calcul des scores…
+              </p>
             )}
           </motion.div>
         )}
