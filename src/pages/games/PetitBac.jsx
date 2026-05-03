@@ -195,6 +195,24 @@ export default function PetitBac() {
     })
   }
 
+  // ── Soumettre les réponses ────────────────────────────────────────────────
+  const handleSubmitAnswers = useCallback(async () => {
+    if (!currentRound || !myPlayerId) return
+    clearTimeout(timerRef.current)
+    setTimerRunning(false)
+
+    const activeCats = room?.categories || []
+    const rows = activeCats.map(cat => ({
+      round_id: currentRound.id,
+      player_id: myPlayerId,
+      category: cat,
+      answer: myAnswers[cat] || '',
+    }))
+
+    await supabase.from('bac_answers').insert(rows)
+    await supabase.from('bac_players').update({ status: 'answered' }).eq('id', myPlayerId)
+  }, [currentRound, myPlayerId, myAnswers, room?.categories])
+
   // ── Créer une room ─────────────────────────────────────────────────────────
   async function handleCreate() {
     if (!myName.trim()) return
@@ -456,6 +474,91 @@ export default function PetitBac() {
               <p className="text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
                 En attente du host…
               </p>
+            )}
+          </motion.div>
+        )}
+
+        {/* ── PLAYING ────────────────────────────────────────────────────── */}
+        {phase === 'playing' && currentRound && room && (
+          <motion.div
+            key="playing"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex flex-col gap-4"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
+                  Round {room.current_round}{room.total_rounds > 0 ? `/${room.total_rounds}` : ''}
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                  {players.filter(p => p.status === 'answered').length}/{players.length} ont répondu
+                </p>
+              </div>
+              <motion.div
+                initial={{ scale: 0.5, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="text-6xl font-black"
+                style={{ color: '#F59E0B' }}
+              >
+                {currentRound.letter}
+              </motion.div>
+              {room.timer_seconds > 0 ? (
+                <div
+                  className="text-2xl font-bold tabular-nums"
+                  style={{ color: timeLeft <= 10 ? '#EF4444' : '#10B981', minWidth: 40, textAlign: 'right' }}
+                >
+                  {timeLeft}s
+                </div>
+              ) : (
+                <div style={{ width: 40 }} />
+              )}
+            </div>
+
+            <div className="flex flex-col gap-3">
+              {(room.categories || []).map(catId => {
+                const cat = ALL_CATEGORIES.find(c => c.id === catId)
+                if (!cat) return null
+                const alreadyAnswered = players.find(p => p.id === myPlayerId)?.status === 'answered'
+                return (
+                  <div key={catId}>
+                    <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-text-muted)' }}>
+                      {cat.label}
+                    </p>
+                    <input
+                      value={myAnswers[catId] || ''}
+                      onChange={e => setMyAnswers(prev => ({ ...prev, [catId]: e.target.value }))}
+                      placeholder={`Un mot en ${currentRound.letter}…`}
+                      disabled={alreadyAnswered}
+                      className="w-full rounded-xl px-4 py-3 text-sm text-white"
+                      style={{
+                        background: 'rgba(255,255,255,0.07)',
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        outline: 'none',
+                        opacity: alreadyAnswered ? 0.5 : 1,
+                      }}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+
+            {players.find(p => p.id === myPlayerId)?.status !== 'answered' && (
+              <Button onClick={handleSubmitAnswers} fullWidth size="lg" variant="primary">
+                ✅ Terminé !
+              </Button>
+            )}
+
+            {players.find(p => p.id === myPlayerId)?.status === 'answered' && (
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-center text-sm"
+                style={{ color: '#10B981' }}
+              >
+                ✓ Réponses envoyées — en attente des autres joueurs…
+              </motion.p>
             )}
           </motion.div>
         )}
