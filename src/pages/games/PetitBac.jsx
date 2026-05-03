@@ -99,6 +99,102 @@ export default function PetitBac() {
 
   const isHost = room && myPlayerId && room.host_id === myPlayerId
 
+  // ── Realtime subscriptions ────────────────────────────────────────────────
+  useEffect(() => {
+    if (!room) return
+
+    const channel = supabase.channel(`room-${room.id}`)
+
+    channel
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bac_rooms', filter: `id=eq.${room.id}` },
+        payload => {
+          if (payload.new) setRoom(payload.new)
+        }
+      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bac_players', filter: `room_id=eq.${room.id}` },
+        payload => {
+          if (payload.eventType === 'INSERT') {
+            setPlayers(prev => [...prev.filter(p => p.id !== payload.new.id), payload.new])
+          } else if (payload.eventType === 'UPDATE') {
+            setPlayers(prev => prev.map(p => p.id === payload.new.id ? payload.new : p))
+          } else if (payload.eventType === 'DELETE') {
+            setPlayers(prev => prev.filter(p => p.id !== payload.old.id))
+          }
+        }
+      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bac_rounds', filter: `room_id=eq.${room.id}` },
+        payload => {
+          if (payload.new) setCurrentRound(payload.new)
+        }
+      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bac_answers' },
+        payload => {
+          if (payload.new) {
+            setAnswers(prev => [...prev.filter(a => a.id !== payload.new.id), payload.new])
+          }
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [room?.id])
+
+  // ── Transitions de phase selon room.status ────────────────────────────────
+  useEffect(() => {
+    if (!room) return
+    if (room.status === 'waiting')   setPhase('lobby')
+    if (room.status === 'playing')   { setPhase('playing'); initTimer(room.timer_seconds) }
+    if (room.status === 'revealing') setPhase('revealing')
+    if (room.status === 'scores')    setPhase('scores')
+    if (room.status === 'finished')  setPhase('finished')
+  }, [room?.status])
+
+  // ── Host détecte quand tous ont répondu ───────────────────────────────────
+  useEffect(() => {
+    if (!isHost || !currentRound || room?.status !== 'playing') return
+    const allAnswered = players.length >= 2 && players.every(p => p.status === 'answered')
+    if (allAnswered) {
+      supabase.from('bac_rooms').update({ status: 'revealing' }).eq('id', room.id)
+    }
+  }, [players, isHost, currentRound, room?.status])
+
+  // ── Timer ─────────────────────────────────────────────────────────────────
+  function initTimer(seconds) {
+    if (seconds === 0) return
+    setTimeLeft(seconds)
+    setTimerRunning(true)
+  }
+
+  useEffect(() => {
+    if (!timerRunning) return
+    if (timeLeft <= 0) {
+      setTimerRunning(false)
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200])
+      handleSubmitAnswers()
+      return
+    }
+    timerRef.current = setTimeout(() => setTimeLeft(t => t - 1), 1000)
+    return () => clearTimeout(timerRef.current)
+  }, [timerRunning, timeLeft])
+
+  // ── Lancer la partie (host) ───────────────────────────────────────────────
+  async function handleStartGame() {
+    const activeCats = Object.entries(hostCategories).filter(([, v]) => v).map(([k]) => k)
+    await supabase.from('bac_rooms').update({
+      status: 'playing',
+      timer_seconds: hostTimer,
+      total_rounds: hostRounds,
+      categories: activeCats,
+      current_round: 1,
+    }).eq('id', room.id)
+
+    await supabase.from('bac_rounds').insert({
+      room_id: room.id,
+      round_number: 1,
+      letter: randomLetter(),
+    })
+  }
+
   // ── Créer une room ─────────────────────────────────────────────────────────
   async function handleCreate() {
     if (!myName.trim()) return
@@ -231,6 +327,136 @@ export default function PetitBac() {
                 <p className="text-sm mt-2" style={{ color: '#EF4444' }}>{joinError}</p>
               )}
             </div>
+          </motion.div>
+        )}
+
+        {/* ── LOBBY ──────────────────────────────────────────────────────── */}
+        {phase === 'lobby' && room && (
+          <motion.div
+            key="lobby"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="flex flex-col gap-6"
+          >
+            <div className="text-center">
+              <p className="text-sm mb-1" style={{ color: 'var(--color-text-muted)' }}>
+                Code de la partie
+              </p>
+              <p className="text-5xl font-bold tracking-widest" style={{ color: '#F59E0B' }}>
+                {room.code}
+              </p>
+              <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                Partage ce code avec tes amis
+              </p>
+            </div>
+
+            <div>
+              <p className="text-sm font-semibold text-white mb-2">
+                Joueurs ({players.length})
+              </p>
+              <div className="flex flex-col gap-2">
+                {players.map(p => (
+                  <div
+                    key={p.id}
+                    className="flex items-center gap-3 rounded-xl px-4 py-3"
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+                  >
+                    <span className="text-lg">{p.is_host ? '👑' : '👤'}</span>
+                    <span className="font-semibold text-white">{p.name}</span>
+                    {p.id === myPlayerId && (
+                      <span className="text-xs ml-auto" style={{ color: 'var(--color-text-muted)' }}>toi</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {isHost && (
+              <>
+                <div>
+                  <p className="text-sm font-semibold text-white mb-2">Catégories</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {ALL_CATEGORIES.map(cat => {
+                      const active = hostCategories[cat.id]
+                      return (
+                        <motion.button
+                          key={cat.id}
+                          whileTap={{ scale: 0.97 }}
+                          onClick={() => setHostCategories(prev => ({ ...prev, [cat.id]: !prev[cat.id] }))}
+                          className="flex items-center justify-between rounded-xl px-3 py-2 text-left text-sm"
+                          style={{
+                            background: active ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.04)',
+                            border: `1px solid ${active ? '#F59E0B' : 'rgba(255,255,255,0.08)'}`,
+                            color: active ? '#fff' : 'var(--color-text-muted)',
+                          }}
+                        >
+                          {cat.label}
+                          {active && <span style={{ color: '#F59E0B' }}>✓</span>}
+                        </motion.button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-sm font-semibold text-white mb-2">Timer</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {TIMER_OPTIONS.map(opt => (
+                      <motion.button
+                        key={opt.value}
+                        whileTap={{ scale: 0.96 }}
+                        onClick={() => setHostTimer(opt.value)}
+                        className="px-4 py-2 rounded-xl text-sm font-semibold"
+                        style={{
+                          background: hostTimer === opt.value ? 'rgba(249,115,22,0.25)' : 'rgba(255,255,255,0.05)',
+                          border: `1px solid ${hostTimer === opt.value ? '#F97316' : 'rgba(255,255,255,0.1)'}`,
+                          color: hostTimer === opt.value ? '#F97316' : 'var(--color-text-muted)',
+                        }}
+                      >
+                        {opt.label}
+                      </motion.button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-sm font-semibold text-white mb-2">Rounds</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {ROUND_OPTIONS.map(opt => (
+                      <motion.button
+                        key={opt.value}
+                        whileTap={{ scale: 0.96 }}
+                        onClick={() => setHostRounds(opt.value)}
+                        className="px-4 py-2 rounded-xl text-sm font-semibold"
+                        style={{
+                          background: hostRounds === opt.value ? 'rgba(245,158,11,0.25)' : 'rgba(255,255,255,0.05)',
+                          border: `1px solid ${hostRounds === opt.value ? '#F59E0B' : 'rgba(255,255,255,0.1)'}`,
+                          color: hostRounds === opt.value ? '#F59E0B' : 'var(--color-text-muted)',
+                        }}
+                      >
+                        {opt.label}
+                      </motion.button>
+                    ))}
+                  </div>
+                </div>
+
+                <Button
+                  onClick={handleStartGame}
+                  fullWidth
+                  size="lg"
+                  disabled={players.length < 2 || Object.values(hostCategories).every(v => !v)}
+                >
+                  🚀 Lancer la partie
+                </Button>
+              </>
+            )}
+
+            {!isHost && (
+              <p className="text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                En attente du host…
+              </p>
+            )}
           </motion.div>
         )}
 
