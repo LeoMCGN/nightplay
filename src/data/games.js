@@ -63,4 +63,20 @@ export const GAMES = [
       { label: '⏱ Timer', color: '#F97316' },
     ],
   },
+  {
+    id: 'petit-bac',
+    name: 'Le Petit Bac',
+    emoji: '🔤',
+    description: 'Trouve un mot par catégorie avant les autres !',
+    color: '#F59E0B',
+    gradient: 'from-amber-500 to-yellow-600',
+    minPlayers: 2,
+    maxPlayers: 16,
+    route: '/play/petit-bac',
+    tags: [
+      { label: '📱 Multijoueur', color: '#3B82F6' },
+      { label: '🧠 Culture générale', color: '#8B5CF6' },
+      { label: '⏱ Timer', color: '#F97316' },
+    ],
+  },
 ]
