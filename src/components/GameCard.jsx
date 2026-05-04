@@ -13,7 +13,7 @@ export default function GameCard({ game, index }) {
       transition={{ duration: 0.4, delay: index * 0.1 }}
       whileHover={{ y: -4, scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
-      onClick={() => navigate(`/setup/${game.id}`)}
+      onClick={() => navigate(game.online ? game.route : `/setup/${game.id}`)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className="relative cursor-pointer rounded-2xl p-6 flex flex-col gap-3 overflow-hidden select-none"

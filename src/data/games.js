@@ -73,6 +73,7 @@ export const GAMES = [
     minPlayers: 2,
     maxPlayers: 16,
     route: '/play/petit-bac',
+    online: true,
     tags: [
       { label: '📱 Multijoueur', color: '#3B82F6' },
       { label: '🧠 Culture générale', color: '#8B5CF6' },
@@ -89,6 +90,7 @@ export const GAMES = [
     minPlayers: 3,
     maxPlayers: 12,
     route: '/play/imposteur-online',
+    online: true,
     tags: [
       { label: '📱 Multijoueur', color: '#3B82F6' },
       { label: '🧠 Stratégie', color: '#7C3AED' },
