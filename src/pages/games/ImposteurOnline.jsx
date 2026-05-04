@@ -184,6 +184,24 @@ export default function ImposteurOnline() {
     return () => clearTimeout(timerRef.current)
   }, [timerRunning, timeLeft, isHost, room])
 
+  // ── Calcul résultats (host) ───────────────────────────────────────────────
+  const computeAndSaveResults = useCallback(async () => {
+    if (!isHost || computedRef.current) return
+    computedRef.current = true
+    const { tally, imposteurPlayer, found } = calcTally(players)
+
+    await Promise.all(players.map(p => {
+      const delta = found && !p.is_imposteur ? 1 : (!found && p.is_imposteur ? 2 : 0)
+      if (!delta) return Promise.resolve()
+      return supabase.from('imp_players').update({ score: p.score + delta }).eq('id', p.id)
+    }))
+
+    await supabase.from('imp_rooms').update({ status: 'revealing' }).eq('id', room.id)
+    setTimeout(async () => {
+      await supabase.from('imp_rooms').update({ status: 'result' }).eq('id', room.id)
+    }, 2600)
+  }, [isHost, players, room])
+
   // ── Host détecte quand tous ont voté ─────────────────────────────────────
   useEffect(() => {
     if (!isHost || room?.status !== 'vote') return
@@ -242,24 +260,6 @@ export default function ImposteurOnline() {
   async function handleVote(suspectName) {
     await supabase.from('imp_players').update({ voted_for: suspectName }).eq('id', myPlayerId)
   }
-
-  // ── Calcul résultats (host) ───────────────────────────────────────────────
-  const computeAndSaveResults = useCallback(async () => {
-    if (!isHost || computedRef.current) return
-    computedRef.current = true
-    const { tally, imposteurPlayer, found } = calcTally(players)
-
-    await Promise.all(players.map(p => {
-      const delta = found && !p.is_imposteur ? 1 : (!found && p.is_imposteur ? 2 : 0)
-      if (!delta) return Promise.resolve()
-      return supabase.from('imp_players').update({ score: p.score + delta }).eq('id', p.id)
-    }))
-
-    await supabase.from('imp_rooms').update({ status: 'revealing' }).eq('id', room.id)
-    setTimeout(async () => {
-      await supabase.from('imp_rooms').update({ status: 'result' }).eq('id', room.id)
-    }, 2600)
-  }, [isHost, players, room])
 
   // ── Manche suivante ───────────────────────────────────────────────────────
   async function handleNextRound() {
