@@ -54,6 +54,8 @@ export default function ImposteurOnline() {
   const [myPlayerId, setMyPlayerId] = useState(null)
   const [joinCode, setJoinCode]     = useState('')
   const [joinError, setJoinError]   = useState('')
+  const [showJoin, setShowJoin]     = useState(false)
+  const [codeCopied, setCodeCopied] = useState(false)
 
   // État du jeu (miroir Supabase)
   const [room, setRoom]               = useState(null)
@@ -288,30 +290,74 @@ export default function ImposteurOnline() {
               <h2 className="text-2xl font-bold text-white mb-1">🕵️ L'Imposteur Online</h2>
               <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Multijoueur — chacun sur son téléphone</p>
             </div>
+
             <div>
               <p className="text-sm font-semibold text-white mb-2">Ton prénom</p>
-              <input value={myName} onChange={e => setMyName(e.target.value)} placeholder="Entrer ton prénom…" className="w-full rounded-xl px-4 py-3 text-sm text-white" style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', outline: 'none' }} />
+              <input
+                value={myName}
+                onChange={e => setMyName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && myName.trim() && handleCreate()}
+                placeholder="Entre ton prénom…"
+                className="w-full rounded-xl px-4 py-3 text-sm text-white"
+                style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', outline: 'none' }}
+              />
             </div>
-            <Button onClick={handleCreate} fullWidth size="lg" disabled={!myName.trim()}>🎮 Créer une partie</Button>
-            <div>
-              <p className="text-sm font-semibold text-white mb-2">Rejoindre avec un code</p>
-              <div className="flex gap-2">
-                <input value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="EX: ABCDEF" maxLength={6} className="flex-1 rounded-xl px-4 py-3 text-sm text-white font-mono tracking-widest" style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', outline: 'none' }} />
-                <Button onClick={handleJoin} size="md" variant="secondary" disabled={!myName.trim() || joinCode.length < 6}>Rejoindre</Button>
-              </div>
-              {joinError && <p className="text-sm mt-2" style={{ color: '#EF4444' }}>{joinError}</p>}
-            </div>
+
+            <AnimatePresence>
+              {myName.trim() && (
+                <motion.div key="actions" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex flex-col gap-3">
+                  <Button onClick={handleCreate} fullWidth size="lg">🎮 Créer une partie</Button>
+
+                  <div className="flex items-center gap-3">
+                    <div className="h-px flex-1" style={{ background: 'rgba(255,255,255,0.1)' }} />
+                    <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>ou</span>
+                    <div className="h-px flex-1" style={{ background: 'rgba(255,255,255,0.1)' }} />
+                  </div>
+
+                  {!showJoin ? (
+                    <Button onClick={() => setShowJoin(true)} fullWidth size="lg" variant="secondary">🔑 Rejoindre une partie</Button>
+                  ) : (
+                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-2">
+                      <input
+                        value={joinCode}
+                        onChange={e => setJoinCode(e.target.value.toUpperCase())}
+                        onKeyDown={e => e.key === 'Enter' && joinCode.length === 6 && handleJoin()}
+                        placeholder="Code à 6 lettres — ex : ABCDEF"
+                        maxLength={6}
+                        autoFocus
+                        className="w-full rounded-xl px-4 py-3 text-center text-lg text-white font-mono tracking-widest"
+                        style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', outline: 'none' }}
+                      />
+                      <Button onClick={handleJoin} fullWidth size="lg" variant="secondary" disabled={joinCode.length < 6}>Rejoindre →</Button>
+                      {joinError && <p className="text-sm text-center" style={{ color: '#EF4444' }}>{joinError}</p>}
+                    </motion.div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
 
         {/* ── LOBBY ──────────────────────────────────────────────────────── */}
         {phase === 'lobby' && room && (
-          <motion.div key="lobby" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="flex flex-col gap-6">
-            <div className="text-center">
-              <p className="text-sm mb-1" style={{ color: 'var(--color-text-muted)' }}>Code de la partie</p>
-              <p className="text-5xl font-bold tracking-widest" style={{ color: '#7C3AED' }}>{room.code}</p>
-              <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>Partage ce code avec tes amis</p>
+          <motion.div key="lobby" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="flex flex-col gap-5">
+
+            {/* Bloc code */}
+            <div className="rounded-2xl p-5 flex flex-col items-center gap-3" style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.3)' }}>
+              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>Code de la partie</p>
+              <p className="text-5xl font-bold font-mono tracking-widest" style={{ color: '#7C3AED' }}>{room.code}</p>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => { navigator.clipboard.writeText(room.code); setCodeCopied(true); setTimeout(() => setCodeCopied(false), 2000) }}
+                className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold"
+                style={{ background: codeCopied ? 'rgba(16,185,129,0.2)' : 'rgba(124,58,237,0.15)', border: `1px solid ${codeCopied ? '#10B981' : '#7C3AED'}`, color: codeCopied ? '#10B981' : '#A78BFA' }}
+              >
+                {codeCopied ? '✓ Copié !' : '📋 Copier'}
+              </motion.button>
+              <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Partage ce code avec tes amis</p>
             </div>
+
+            {/* Joueurs */}
             <div>
               <p className="text-sm font-semibold text-white mb-2">Joueurs ({players.length})</p>
               <div className="flex flex-col gap-2">
@@ -324,35 +370,50 @@ export default function ImposteurOnline() {
                 ))}
               </div>
             </div>
+
+            {/* Paramètres host */}
             {isHost && (
-              <>
+              <div className="rounded-2xl p-4 flex flex-col gap-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <p className="text-sm font-semibold text-white">⚙️ Paramètres</p>
+
                 <div>
-                  <p className="text-sm font-semibold text-white mb-2">Timer de discussion</p>
+                  <p className="text-xs mb-2" style={{ color: 'var(--color-text-muted)' }}>Timer de discussion</p>
                   <div className="flex gap-2 flex-wrap">
                     {TIMER_OPTIONS.map(opt => (
-                      <motion.button key={opt.value} whileTap={{ scale: 0.96 }} onClick={() => setHostTimer(opt.value)} className="px-4 py-2 rounded-xl text-sm font-semibold"
+                      <motion.button key={opt.value} whileTap={{ scale: 0.96 }} onClick={() => setHostTimer(opt.value)}
+                        className="px-4 py-2 rounded-xl text-sm font-semibold"
                         style={{ background: hostTimer === opt.value ? 'rgba(124,58,237,0.25)' : 'rgba(255,255,255,0.05)', border: `1px solid ${hostTimer === opt.value ? '#7C3AED' : 'rgba(255,255,255,0.1)'}`, color: hostTimer === opt.value ? '#A78BFA' : 'var(--color-text-muted)' }}>
                         {opt.label}
                       </motion.button>
                     ))}
                   </div>
                 </div>
+
                 <div>
-                  <p className="text-sm font-semibold text-white mb-2">Manches</p>
+                  <p className="text-xs mb-2" style={{ color: 'var(--color-text-muted)' }}>Manches</p>
                   <div className="flex gap-2 flex-wrap">
                     {ROUND_OPTIONS.map(opt => (
-                      <motion.button key={opt.value} whileTap={{ scale: 0.96 }} onClick={() => setHostRounds(opt.value)} className="px-4 py-2 rounded-xl text-sm font-semibold"
+                      <motion.button key={opt.value} whileTap={{ scale: 0.96 }} onClick={() => setHostRounds(opt.value)}
+                        className="px-4 py-2 rounded-xl text-sm font-semibold"
                         style={{ background: hostRounds === opt.value ? 'rgba(124,58,237,0.25)' : 'rgba(255,255,255,0.05)', border: `1px solid ${hostRounds === opt.value ? '#7C3AED' : 'rgba(255,255,255,0.1)'}`, color: hostRounds === opt.value ? '#A78BFA' : 'var(--color-text-muted)' }}>
                         {opt.label}
                       </motion.button>
                     ))}
                   </div>
                 </div>
-                <Button onClick={handleStartGame} fullWidth size="lg" disabled={players.length < 3}>🚀 Lancer la partie</Button>
+
+                <Button onClick={handleStartGame} fullWidth size="lg" disabled={players.length < 3}>
+                  🚀 Lancer la partie
+                </Button>
                 {players.length < 3 && <p className="text-center text-xs" style={{ color: 'var(--color-text-muted)' }}>Il faut au moins 3 joueurs</p>}
-              </>
+              </div>
             )}
-            {!isHost && <p className="text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>En attente du host…</p>}
+
+            {!isHost && (
+              <p className="text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                En attente que le host lance la partie…
+              </p>
+            )}
           </motion.div>
         )}
 
