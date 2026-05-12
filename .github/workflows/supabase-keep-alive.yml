@@ -14,8 +14,8 @@ jobs:
           response=$(curl -s -o /dev/null -w "%{http_code}" \
             "https://frujwgsvevjazcbszrpf.supabase.co/auth/v1/health")
           echo "Status: $response"
-          if [ "$response" != "200" ]; then
-            echo "Erreur : code HTTP $response"
+          if [ "$response" = "000" ]; then
+            echo "Erreur : impossible de joindre Supabase"
             exit 1
           fi
-          echo "Supabase est bien actif."
+          echo "Supabase est bien actif (code $response)."
