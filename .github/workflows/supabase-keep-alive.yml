@@ -2,20 +2,22 @@ name: Supabase Keep Alive
 
 on:
   schedule:
-    - cron: '0 8 */5 * *'  # Toutes les 5 jours à 8h UTC
-  workflow_dispatch:        # Lancement manuel possible
+    - cron: '0 8 */4 * *'
+  workflow_dispatch:
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase
+      - name: Ping Supabase DB
         run: |
           response=$(curl -s -o /dev/null -w "%{http_code}" \
-            "https://frujwgsvevjazcbszrpf.supabase.co/auth/v1/health")
+            "https://frujwgsvevjazcbszrpf.supabase.co/rest/v1/bac_rooms?select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
           echo "Status: $response"
           if [ "$response" = "000" ]; then
             echo "Erreur : impossible de joindre Supabase"
             exit 1
           fi
-          echo "Supabase est bien actif (code $response)."
+          echo "Supabase DB bien actif (code $response)."
