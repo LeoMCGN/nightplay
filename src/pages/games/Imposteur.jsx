@@ -22,6 +22,7 @@ export default function Imposteur() {
 
   const discussionTime  = location.state?.options?.discussionTime ?? 120
   const manchesTotal    = location.state?.options?.manchesTotal   ?? null  // null = illimité
+  const imposteurKnows  = location.state?.options?.imposteurKnows ?? true  // false = l'imposteur s'ignore
 
   useEffect(() => {
     if (players.length === 0) navigate('/')
@@ -238,7 +239,7 @@ export default function Imposteur() {
                       exit={{ opacity: 0, scale: 0.8 }}
                       className="flex flex-col items-center gap-3"
                     >
-                      {currentEntry?.isImposteur ? (
+                      {currentEntry?.isImposteur && imposteurKnows ? (
                         <>
                           <span className="text-4xl">⚠️</span>
                           <p className="text-xl font-bold text-orange-400">Tu es l'IMPOSTEUR !</p>

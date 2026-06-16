@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { supabase } from '../../lib/supabase'
+import { supabase, supabaseErrorMessage } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import Button from '../../components/Button'
 import pairesData from '../../data/imposteur.json'
@@ -54,6 +54,8 @@ export default function ImposteurOnline() {
   const [myPlayerId, setMyPlayerId] = useState(null)
   const [joinCode, setJoinCode]     = useState('')
   const [joinError, setJoinError]   = useState('')
+  const [errorMsg, setErrorMsg]     = useState('')
+  const [busy, setBusy]             = useState(false)
   const [showJoin, setShowJoin]     = useState(false)
   const [codeCopied, setCodeCopied] = useState(false)
 
@@ -71,6 +73,7 @@ export default function ImposteurOnline() {
   // Config lobby (host uniquement)
   const [hostTimer,  setHostTimer]  = useState(120)
   const [hostRounds, setHostRounds] = useState(0)
+  const [hostKnows,  setHostKnows]  = useState(true)
 
   const isHost   = room && myPlayerId && room.host_id === myPlayerId
   const myPlayer = players.find(p => p.id === myPlayerId)
@@ -78,61 +81,79 @@ export default function ImposteurOnline() {
 
   // ── Créer une room ─────────────────────────────────────────────────────────
   async function handleCreate() {
-    if (!myName.trim()) return
-    const code = generateCode()
-    const playerId = crypto.randomUUID()
+    if (!myName.trim() || busy) return
+    setErrorMsg('')
+    setBusy(true)
+    try {
+      const code = generateCode()
+      const playerId = crypto.randomUUID()
 
-    const { data: roomData, error: roomErr } = await supabase
-      .from('imp_rooms')
-      .insert({ code, host_id: playerId })
-      .select()
-      .single()
-    if (roomErr) { console.error(roomErr); return }
+      const { data: roomData, error: roomErr } = await supabase
+        .from('imp_rooms')
+        .insert({ code, host_id: playerId })
+        .select()
+        .single()
+      if (roomErr) throw roomErr
 
-    const { data: playerData, error: playerErr } = await supabase
-      .from('imp_players')
-      .insert({ id: playerId, room_id: roomData.id, name: myName.trim(), is_host: true })
-      .select()
-      .single()
-    if (playerErr) { console.error(playerErr); return }
+      const { data: playerData, error: playerErr } = await supabase
+        .from('imp_players')
+        .insert({ id: playerId, room_id: roomData.id, name: myName.trim(), is_host: true })
+        .select()
+        .single()
+      if (playerErr) throw playerErr
 
-    setMyPlayerId(playerId)
-    setRoom(roomData)
-    setPlayers([playerData])
-    setPhase('lobby')
+      setMyPlayerId(playerId)
+      setRoom(roomData)
+      setPlayers([playerData])
+      setPhase('lobby')
+    } catch (err) {
+      console.error(err)
+      setErrorMsg(supabaseErrorMessage(err, 'créer la partie'))
+    } finally {
+      setBusy(false)
+    }
   }
 
   // ── Rejoindre une room ────────────────────────────────────────────────────
   async function handleJoin() {
-    if (!myName.trim() || !joinCode.trim()) return
+    if (!myName.trim() || !joinCode.trim() || busy) return
     setJoinError('')
+    setErrorMsg('')
+    setBusy(true)
+    try {
+      const { data: roomData, error: roomErr } = await supabase
+        .from('imp_rooms')
+        .select()
+        .eq('code', joinCode.trim().toUpperCase())
+        .eq('status', 'waiting')
+        .maybeSingle()
+      if (roomErr) throw roomErr
+      if (!roomData) { setJoinError('Code invalide ou partie déjà commencée.'); return }
 
-    const { data: roomData, error: roomErr } = await supabase
-      .from('imp_rooms')
-      .select()
-      .eq('code', joinCode.trim().toUpperCase())
-      .eq('status', 'waiting')
-      .single()
-    if (roomErr || !roomData) { setJoinError('Code invalide ou partie déjà commencée.'); return }
+      const playerId = crypto.randomUUID()
+      const { error: playerErr } = await supabase
+        .from('imp_players')
+        .insert({ id: playerId, room_id: roomData.id, name: myName.trim(), is_host: false })
+      if (playerErr) throw playerErr
 
-    const playerId = crypto.randomUUID()
-    const { error: playerErr } = await supabase
-      .from('imp_players')
-      .insert({ id: playerId, room_id: roomData.id, name: myName.trim(), is_host: false })
-    if (playerErr) { console.error(playerErr); return }
+      const { data: existingPlayers } = await supabase
+        .from('imp_players').select().eq('room_id', roomData.id)
 
-    const { data: existingPlayers } = await supabase
-      .from('imp_players').select().eq('room_id', roomData.id)
+      const newPlayer = { id: playerId, room_id: roomData.id, name: myName.trim(), is_host: false, score: 0, word: null, is_imposteur: false, voted_for: null, status: 'waiting' }
+      const allPlayers = existingPlayers
+        ? existingPlayers.some(p => p.id === playerId) ? existingPlayers : [...existingPlayers, newPlayer]
+        : [newPlayer]
 
-    const newPlayer = { id: playerId, room_id: roomData.id, name: myName.trim(), is_host: false, score: 0, word: null, is_imposteur: false, voted_for: null, status: 'waiting' }
-    const allPlayers = existingPlayers
-      ? existingPlayers.some(p => p.id === playerId) ? existingPlayers : [...existingPlayers, newPlayer]
-      : [newPlayer]
-
-    setMyPlayerId(playerId)
-    setRoom(roomData)
-    setPlayers(allPlayers)
-    setPhase('lobby')
+      setMyPlayerId(playerId)
+      setRoom(roomData)
+      setPlayers(allPlayers)
+      setPhase('lobby')
+    } catch (err) {
+      console.error(err)
+      setErrorMsg(supabaseErrorMessage(err, 'rejoindre la partie'))
+    } finally {
+      setBusy(false)
+    }
   }
 
   // ── Realtime subscriptions ────────────────────────────────────────────────
@@ -214,6 +235,7 @@ export default function ImposteurOnline() {
     await supabase.from('imp_rooms').update({
       discussion_time: hostTimer,
       total_rounds: hostRounds,
+      imposteur_knows: hostKnows,
       current_round: 1,
     }).eq('id', room.id)
     await handleStartRound(1)
@@ -306,7 +328,7 @@ export default function ImposteurOnline() {
             <AnimatePresence>
               {myName.trim() && (
                 <motion.div key="actions" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex flex-col gap-3">
-                  <Button onClick={handleCreate} fullWidth size="lg">🎮 Créer une partie</Button>
+                  <Button onClick={handleCreate} fullWidth size="lg" disabled={busy}>{busy ? '⏳ Création…' : '🎮 Créer une partie'}</Button>
 
                   <div className="flex items-center gap-3">
                     <div className="h-px flex-1" style={{ background: 'rgba(255,255,255,0.1)' }} />
@@ -328,8 +350,18 @@ export default function ImposteurOnline() {
                         className="w-full rounded-xl px-4 py-3 text-center text-lg text-white font-mono tracking-widest"
                         style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', outline: 'none' }}
                       />
-                      <Button onClick={handleJoin} fullWidth size="lg" variant="secondary" disabled={joinCode.length < 6}>Rejoindre →</Button>
+                      <Button onClick={handleJoin} fullWidth size="lg" variant="secondary" disabled={busy || joinCode.length < 6}>{busy ? '⏳ Connexion…' : 'Rejoindre →'}</Button>
                       {joinError && <p className="text-sm text-center" style={{ color: '#EF4444' }}>{joinError}</p>}
+                    </motion.div>
+                  )}
+
+                  {errorMsg && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                      className="rounded-xl px-4 py-3 text-sm text-center"
+                      style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.4)', color: '#FCA5A5' }}
+                    >
+                      {errorMsg}
                     </motion.div>
                   )}
                 </motion.div>
@@ -402,6 +434,27 @@ export default function ImposteurOnline() {
                   </div>
                 </div>
 
+                <div>
+                  <p className="text-xs mb-2" style={{ color: 'var(--color-text-muted)' }}>L'imposteur connaît son rôle ?</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {[
+                      { label: 'Oui', value: true },
+                      { label: 'Non — mode difficile', value: false },
+                    ].map(opt => (
+                      <motion.button key={String(opt.value)} whileTap={{ scale: 0.96 }} onClick={() => setHostKnows(opt.value)}
+                        className="px-4 py-2 rounded-xl text-sm font-semibold"
+                        style={{ background: hostKnows === opt.value ? 'rgba(124,58,237,0.25)' : 'rgba(255,255,255,0.05)', border: `1px solid ${hostKnows === opt.value ? '#7C3AED' : 'rgba(255,255,255,0.1)'}`, color: hostKnows === opt.value ? '#A78BFA' : 'var(--color-text-muted)' }}>
+                        {opt.label}
+                      </motion.button>
+                    ))}
+                  </div>
+                  {!hostKnows && (
+                    <p className="text-xs mt-2" style={{ color: 'var(--color-text-muted)' }}>
+                      L'imposteur verra un mot normal, sans savoir qu'il est l'imposteur.
+                    </p>
+                  )}
+                </div>
+
                 <Button onClick={handleStartGame} fullWidth size="lg" disabled={players.length < 3}>
                   🚀 Lancer la partie
                 </Button>
@@ -427,9 +480,12 @@ export default function ImposteurOnline() {
               <h2 className="text-2xl font-bold text-white">Ton mot secret</h2>
             </div>
 
+            {(() => {
+            const showImposteur = myPlayer.is_imposteur && room?.imposteur_knows !== false
+            return (
             <div className="w-full max-w-xs rounded-2xl p-8 flex flex-col items-center gap-4"
-              style={{ background: myPlayer.is_imposteur ? 'rgba(249,115,22,0.1)' : 'rgba(124,58,237,0.1)', border: `2px solid ${myPlayer.is_imposteur ? '#F97316' : '#7C3AED'}` }}>
-              {myPlayer.is_imposteur ? (
+              style={{ background: showImposteur ? 'rgba(249,115,22,0.1)' : 'rgba(124,58,237,0.1)', border: `2px solid ${showImposteur ? '#F97316' : '#7C3AED'}` }}>
+              {showImposteur ? (
                 <>
                   <span className="text-4xl">⚠️</span>
                   <p className="text-xl font-bold text-orange-400">Tu es l'IMPOSTEUR !</p>
@@ -445,6 +501,7 @@ export default function ImposteurOnline() {
                 </>
               )}
             </div>
+            )})()}
 
             {myPlayer.status !== 'ready' ? (
               <Button onClick={handleReady} size="lg" variant="primary" fullWidth>✅ Prêt !</Button>

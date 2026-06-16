@@ -6,8 +6,12 @@ create table if not exists imp_rooms (
   current_round int not null default 0,
   total_rounds int not null default 0,
   discussion_time int not null default 120,
+  imposteur_knows boolean not null default true,
   created_at timestamptz not null default now()
 );
+
+-- Pour une base déjà existante (la table ci-dessus ne sera pas recréée) :
+alter table imp_rooms add column if not exists imposteur_knows boolean not null default true;
 
 create table if not exists imp_players (
   id uuid primary key default gen_random_uuid(),

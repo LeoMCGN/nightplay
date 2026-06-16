@@ -23,6 +23,7 @@ export default function PlayerSetup() {
   // Options Imposteur
   const [discussionTime,  setDiscussionTime]  = useState(120)
   const [manchesTotal,    setManchesTotal]    = useState(3)
+  const [imposteurKnows,  setImposteurKnows]  = useState(true)
 
   const game = GAMES.find(g => g.id === gameId)
   if (!game) { navigate('/'); return null }
@@ -41,7 +42,7 @@ export default function PlayerSetup() {
   function handleStart() {
     if (players.length < game.minPlayers) return
     setCurrentGame(gameId)
-    const options = gameId === 'imposteur' ? { discussionTime, manchesTotal } : {}
+    const options = gameId === 'imposteur' ? { discussionTime, manchesTotal, imposteurKnows } : {}
     navigate(game.route, { state: { options } })
   }
 
@@ -181,6 +182,38 @@ export default function PlayerSetup() {
                 </motion.button>
               ))}
             </div>
+          </div>
+
+          {/* L'imposteur connaît son rôle ? */}
+          <div>
+            <p className="text-sm mb-2" style={{ color: 'var(--color-text-muted)' }}>
+              L'imposteur connaît son rôle ?
+            </p>
+            <div className="flex gap-2">
+              {[
+                { label: 'Oui', value: true },
+                { label: 'Non — mode difficile', value: false },
+              ].map(opt => (
+                <motion.button
+                  key={String(opt.value)}
+                  whileTap={{ scale: 0.96 }}
+                  onClick={() => setImposteurKnows(opt.value)}
+                  className="flex-1 py-2 rounded-xl text-sm font-semibold"
+                  style={{
+                    background: imposteurKnows === opt.value ? 'rgba(124,58,237,0.4)' : 'rgba(255,255,255,0.05)',
+                    border: `1px solid ${imposteurKnows === opt.value ? '#7C3AED' : 'rgba(255,255,255,0.1)'}`,
+                    color: imposteurKnows === opt.value ? '#fff' : 'var(--color-text-muted)',
+                  }}
+                >
+                  {opt.label}
+                </motion.button>
+              ))}
+            </div>
+            {!imposteurKnows && (
+              <p className="text-xs mt-2" style={{ color: 'var(--color-text-muted)' }}>
+                L'imposteur verra un mot normal, sans savoir qu'il est l'imposteur.
+              </p>
+            )}
           </div>
         </motion.div>
       )}

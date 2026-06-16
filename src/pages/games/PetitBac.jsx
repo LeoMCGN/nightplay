@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { supabase } from '../../lib/supabase'
+import { supabase, supabaseErrorMessage } from '../../lib/supabase'
 import Layout from '../../components/Layout'
 import Button from '../../components/Button'
 
@@ -75,6 +75,8 @@ export default function PetitBac() {
   const [myPlayerId, setMyPlayerId] = useState(null)
   const [joinCode, setJoinCode]     = useState('')
   const [joinError, setJoinError]   = useState('')
+  const [errorMsg, setErrorMsg]     = useState('')
+  const [busy, setBusy]             = useState(false)
   const [showJoin, setShowJoin]     = useState(false)
   const [codeCopied, setCodeCopied] = useState(false)
 
@@ -305,67 +307,78 @@ export default function PetitBac() {
 
   // ── Créer une room ─────────────────────────────────────────────────────────
   async function handleCreate() {
-    if (!myName.trim()) return
-    const code = generateCode()
-    const playerId = crypto.randomUUID()
+    if (!myName.trim() || busy) return
+    setErrorMsg('')
+    setBusy(true)
+    try {
+      const code = generateCode()
+      const playerId = crypto.randomUUID()
 
-    const { data: roomData, error: roomErr } = await supabase
-      .from('bac_rooms')
-      .insert({ code, host_id: playerId })
-      .select()
-      .single()
+      const { data: roomData, error: roomErr } = await supabase
+        .from('bac_rooms')
+        .insert({ code, host_id: playerId })
+        .select()
+        .single()
+      if (roomErr) throw roomErr
 
-    if (roomErr) { console.error(roomErr); return }
+      const { data: playerData, error: playerErr } = await supabase
+        .from('bac_players')
+        .insert({ room_id: roomData.id, name: myName.trim(), is_host: true, id: playerId })
+        .select()
+        .single()
+      if (playerErr) throw playerErr
 
-    const { data: playerData, error: playerErr } = await supabase
-      .from('bac_players')
-      .insert({ room_id: roomData.id, name: myName.trim(), is_host: true, id: playerId })
-      .select()
-      .single()
-
-    if (playerErr) { console.error(playerErr); return }
-
-    setMyPlayerId(playerId)
-    setRoom(roomData)
-    setPlayers([playerData])
-    setPhase('lobby')
+      setMyPlayerId(playerId)
+      setRoom(roomData)
+      setPlayers([playerData])
+      setPhase('lobby')
+    } catch (err) {
+      console.error(err)
+      setErrorMsg(supabaseErrorMessage(err, 'créer la partie'))
+    } finally {
+      setBusy(false)
+    }
   }
 
   // ── Rejoindre une room ────────────────────────────────────────────────────
   async function handleJoin() {
-    if (!myName.trim() || !joinCode.trim()) return
+    if (!myName.trim() || !joinCode.trim() || busy) return
     setJoinError('')
+    setErrorMsg('')
+    setBusy(true)
+    try {
+      const { data: roomData, error: roomErr } = await supabase
+        .from('bac_rooms')
+        .select()
+        .eq('code', joinCode.trim().toUpperCase())
+        .eq('status', 'waiting')
+        .maybeSingle()
+      if (roomErr) throw roomErr
+      if (!roomData) { setJoinError('Code invalide ou partie déjà commencée.'); return }
 
-    const { data: roomData, error: roomErr } = await supabase
-      .from('bac_rooms')
-      .select()
-      .eq('code', joinCode.trim().toUpperCase())
-      .eq('status', 'waiting')
-      .single()
+      const playerId = crypto.randomUUID()
+      const { data: playerData, error: playerErr } = await supabase
+        .from('bac_players')
+        .insert({ room_id: roomData.id, name: myName.trim(), is_host: false, id: playerId })
+        .select()
+        .single()
+      if (playerErr) throw playerErr
 
-    if (roomErr || !roomData) {
-      setJoinError('Code invalide ou partie déjà commencée.')
-      return
+      const { data: existingPlayers } = await supabase
+        .from('bac_players')
+        .select()
+        .eq('room_id', roomData.id)
+
+      setMyPlayerId(playerId)
+      setRoom(roomData)
+      setPlayers(existingPlayers && existingPlayers.length ? existingPlayers : [playerData])
+      setPhase('lobby')
+    } catch (err) {
+      console.error(err)
+      setErrorMsg(supabaseErrorMessage(err, 'rejoindre la partie'))
+    } finally {
+      setBusy(false)
     }
-
-    const playerId = crypto.randomUUID()
-    const { data: playerData, error: playerErr } = await supabase
-      .from('bac_players')
-      .insert({ room_id: roomData.id, name: myName.trim(), is_host: false, id: playerId })
-      .select()
-      .single()
-
-    if (playerErr) { console.error(playerErr); return }
-
-    const { data: existingPlayers } = await supabase
-      .from('bac_players')
-      .select()
-      .eq('room_id', roomData.id)
-
-    setMyPlayerId(playerId)
-    setRoom(roomData)
-    setPlayers(existingPlayers || [])
-    setPhase('lobby')
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -397,7 +410,7 @@ export default function PetitBac() {
             <AnimatePresence>
               {myName.trim() && (
                 <motion.div key="actions" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex flex-col gap-3">
-                  <Button onClick={handleCreate} fullWidth size="lg">🎮 Créer une partie</Button>
+                  <Button onClick={handleCreate} fullWidth size="lg" disabled={busy}>{busy ? '⏳ Création…' : '🎮 Créer une partie'}</Button>
 
                   <div className="flex items-center gap-3">
                     <div className="h-px flex-1" style={{ background: 'rgba(255,255,255,0.1)' }} />
@@ -419,8 +432,18 @@ export default function PetitBac() {
                         className="w-full rounded-xl px-4 py-3 text-center text-lg text-white font-mono tracking-widest"
                         style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', outline: 'none' }}
                       />
-                      <Button onClick={handleJoin} fullWidth size="lg" variant="secondary" disabled={joinCode.length < 6}>Rejoindre →</Button>
+                      <Button onClick={handleJoin} fullWidth size="lg" variant="secondary" disabled={busy || joinCode.length < 6}>{busy ? '⏳ Connexion…' : 'Rejoindre →'}</Button>
                       {joinError && <p className="text-sm text-center" style={{ color: '#EF4444' }}>{joinError}</p>}
+                    </motion.div>
+                  )}
+
+                  {errorMsg && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                      className="rounded-xl px-4 py-3 text-sm text-center"
+                      style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.4)', color: '#FCA5A5' }}
+                    >
+                      {errorMsg}
                     </motion.div>
                   )}
                 </motion.div>

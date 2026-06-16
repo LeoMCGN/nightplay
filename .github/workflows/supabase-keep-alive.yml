@@ -1,8 +1,11 @@
 name: Supabase Keep Alive
 
+# Filet de sécurité : le ping principal est fait par un service externe
+# (cron-job.org) car le cron GitHub Actions est régulièrement retardé/sauté
+# et s'auto-désactive après ~60 jours sans commit sur le repo.
 on:
   schedule:
-    - cron: '0 8 */4 * *'
+    - cron: '0 8 * * *'   # tous les jours à 8h UTC
   workflow_dispatch:
 
 jobs:

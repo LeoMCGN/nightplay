@@ -14,7 +14,7 @@ export const GAMES = [
     tags: [
       { label: '👥 Grand public', color: '#6366F1' },
       { label: '💀 Hard', color: '#F97316' },
-      { label: '🔥 Hot', color: '#EC4899' },
+      { label: '🌶️ Extrême', color: '#EC4899' },
     ],
   },
   {
